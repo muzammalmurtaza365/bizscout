@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: bizscout-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGO_URI
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: PING_TARGET_URL
+        value: https://httpbin.org/anything
+      - key: PING_INTERVAL_CRON
+        value: "*/5 * * * *"
+      - key: LOG_LEVEL
+        value: info
+      - key: ANOMALY_WINDOW_HOURS
+        value: "24"
+      - key: ANOMALY_Z_THRESHOLD
+        value: "3"
+      - key: ANOMALY_MIN_SAMPLES
+        value: "10"
+      - key: EWMA_ALPHA
+        value: "0.3"
+      - key: RESPONSE_TTL_DAYS
+        value: "30"
