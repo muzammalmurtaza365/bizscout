@@ -2,7 +2,8 @@ import request from 'supertest';
 import { createApp } from '../app';
 import { ResponseModel } from '../models/Response';
 
-const app = createApp();
+const TEST_KEY = 'test-secret-key-0123456789';
+const app = createApp({ apiKey: TEST_KEY });
 
 describe('health endpoints', () => {
   it('GET /health returns ok (back-compat)', async () => {
@@ -29,7 +30,7 @@ describe('health endpoints', () => {
 
 describe('GET /api/responses', () => {
   it('returns empty list when no data', async () => {
-    const res = await request(app).get('/api/responses');
+    const res = await request(app).get('/api/responses').set('x-api-key', TEST_KEY);
     expect(res.status).toBe(200);
     expect(res.body.items).toEqual([]);
     expect(res.body.hasMore).toBe(false);
@@ -48,7 +49,7 @@ describe('GET /api/responses', () => {
       })),
     );
 
-    const res = await request(app).get('/api/responses?limit=2');
+    const res = await request(app).get('/api/responses?limit=2').set('x-api-key', TEST_KEY);
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(2);
     expect(res.body.hasMore).toBe(true);
@@ -75,26 +76,32 @@ describe('GET /api/responses', () => {
       isAnomaly: true,
     });
 
-    const res = await request(app).get('/api/responses?onlyAnomalies=true');
+    const res = await request(app)
+      .get('/api/responses?onlyAnomalies=true')
+      .set('x-api-key', TEST_KEY);
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(1);
     expect(res.body.items[0].isAnomaly).toBe(true);
   });
 
   it('rejects bad cursor', async () => {
-    const res = await request(app).get('/api/responses?cursor=not-an-objectid');
+    const res = await request(app)
+      .get('/api/responses?cursor=not-an-objectid')
+      .set('x-api-key', TEST_KEY);
     expect(res.status).toBe(400);
   });
 });
 
 describe('GET /api/responses/:id', () => {
   it('returns 404 for missing doc', async () => {
-    const res = await request(app).get('/api/responses/507f1f77bcf86cd799439011');
+    const res = await request(app)
+      .get('/api/responses/507f1f77bcf86cd799439011')
+      .set('x-api-key', TEST_KEY);
     expect(res.status).toBe(404);
   });
 
   it('returns 400 for invalid id', async () => {
-    const res = await request(app).get('/api/responses/bogus');
+    const res = await request(app).get('/api/responses/bogus').set('x-api-key', TEST_KEY);
     expect(res.status).toBe(400);
   });
 
@@ -107,7 +114,9 @@ describe('GET /api/responses/:id', () => {
       responseTimeMs: 150,
       responseSizeBytes: 50,
     });
-    const res = await request(app).get(`/api/responses/${doc._id}`);
+    const res = await request(app)
+      .get(`/api/responses/${doc._id}`)
+      .set('x-api-key', TEST_KEY);
     expect(res.status).toBe(200);
     expect(res.body._id).toBe(doc._id.toString());
   });
@@ -115,7 +124,7 @@ describe('GET /api/responses/:id', () => {
 
 describe('GET /api/stats', () => {
   it('returns zero-ish stats when empty', async () => {
-    const res = await request(app).get('/api/stats');
+    const res = await request(app).get('/api/stats').set('x-api-key', TEST_KEY);
     expect(res.status).toBe(200);
     expect(res.body.count).toBe(0);
     expect(res.body.anomalyCount).toBe(0);
@@ -127,7 +136,7 @@ describe('GET /api/stats', () => {
       { url: 'x', method: 'POST', status: 200, ok: true, responseTimeMs: 200, responseSizeBytes: 1 },
       { url: 'x', method: 'POST', status: 200, ok: true, responseTimeMs: 300, responseSizeBytes: 1, isAnomaly: true },
     ]);
-    const res = await request(app).get('/api/stats?window=24h');
+    const res = await request(app).get('/api/stats?window=24h').set('x-api-key', TEST_KEY);
     expect(res.status).toBe(200);
     expect(res.body.count).toBe(3);
     expect(res.body.mean).toBe(200);
@@ -135,7 +144,7 @@ describe('GET /api/stats', () => {
   });
 
   it('rejects invalid window', async () => {
-    const res = await request(app).get('/api/stats?window=bogus');
+    const res = await request(app).get('/api/stats?window=bogus').set('x-api-key', TEST_KEY);
     expect(res.status).toBe(400);
   });
 });
@@ -145,7 +154,7 @@ describe('GET /metrics', () => {
     // Trigger at least one observed request so http_requests_total appears.
     await request(app).get('/health/live');
 
-    const res = await request(app).get('/metrics');
+    const res = await request(app).get('/metrics').set('x-api-key', TEST_KEY);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/plain/);
     expect(res.text).toContain('http_requests_total');
@@ -155,9 +164,9 @@ describe('GET /metrics', () => {
   });
 
   it('labels routes without expanding cardinality on :id', async () => {
-    await request(app).get('/api/responses/507f1f77bcf86cd799439011');
-    await request(app).get('/api/responses/507f1f77bcf86cd799439012');
-    const res = await request(app).get('/metrics');
+    await request(app).get('/api/responses/507f1f77bcf86cd799439011').set('x-api-key', TEST_KEY);
+    await request(app).get('/api/responses/507f1f77bcf86cd799439012').set('x-api-key', TEST_KEY);
+    const res = await request(app).get('/metrics').set('x-api-key', TEST_KEY);
     // Both requests should share the same route label `/api/responses/:id`
     const hits = res.text.match(/route="\/api\/responses\/:id"/g) ?? [];
     expect(hits.length).toBeGreaterThanOrEqual(1);
