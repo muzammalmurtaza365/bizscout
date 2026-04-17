@@ -6,6 +6,7 @@ import {
   getRollingStats,
   EMPTY_STATS,
   RollingStats,
+  resolveAnomalyPolicy,
 } from '../services/anomaly';
 import { ResponseModel } from '../models/Response';
 
@@ -115,7 +116,26 @@ describe('ewmaForecast', () => {
   });
 });
 
+describe('resolveAnomalyPolicy', () => {
+  it('re-exports policy resolution from the anomaly entrypoint', () => {
+    const policy = resolveAnomalyPolicy({ windowHours: 6, recentSeriesLimit: 5 });
+    expect(policy.windowHours).toBe(6);
+    expect(policy.recentSeriesLimit).toBe(5);
+    expect(policy.zThreshold).toBeGreaterThan(0);
+  });
+});
+
 describe('getRollingStats (integration w/ Mongo)', () => {
+  it('uses the default configured time window when omitted', async () => {
+    const oldDate = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    await ResponseModel.create({ ...baseDoc(), responseTimeMs: 1000, status: 200, ok: true, createdAt: oldDate });
+    await ResponseModel.create({ ...baseDoc(), responseTimeMs: 100, status: 200, ok: true });
+
+    const stats = await getRollingStats();
+    expect(stats.count).toBe(1);
+    expect(stats.mean).toBe(100);
+  });
+
   it('returns empty stats when no data exists', async () => {
     const stats = await getRollingStats(24);
     expect(stats).toEqual(EMPTY_STATS);
@@ -158,6 +178,26 @@ describe('getRollingStats (integration w/ Mongo)', () => {
 });
 
 describe('evaluateAnomaly', () => {
+  it('respects override policy for window, series length, and EWMA alpha', async () => {
+    const oldDate = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await ResponseModel.create({ ...baseDoc(), responseTimeMs: 50, status: 200, ok: true, createdAt: oldDate });
+    await ResponseModel.create({ ...baseDoc(), responseTimeMs: 200, status: 200, ok: true });
+    await ResponseModel.create({ ...baseDoc(), responseTimeMs: 300, status: 200, ok: true });
+
+    const result = await evaluateAnomaly(250, {
+      windowHours: 1,
+      recentSeriesLimit: 2,
+      ewmaAlpha: 1,
+      minSamples: 1,
+      zThreshold: 99,
+    });
+
+    expect(result.stats.count).toBe(2);
+    expect(result.stats.mean).toBe(250);
+    expect(result.predicted).toBe(300);
+    expect(result.isAnomaly).toBe(false);
+  });
+
   it('does not flag until min samples are reached', async () => {
     for (let i = 0; i < 5; i++) {
       await ResponseModel.create({ ...baseDoc(), responseTimeMs: 100, status: 200, ok: true });
