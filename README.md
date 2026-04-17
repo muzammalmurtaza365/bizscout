@@ -51,7 +51,7 @@ bizscount-assessment/
 │   ├── vercel.json          Vercel SPA config
 │   └── package.json
 ├── .github/workflows/ci.yml GitHub Actions CI (lint + test + coverage + build)
-├── docker-compose.yml       Local MongoDB (alternative to Atlas)
+├── docker-compose.yml       Local Docker stack for MongoDB + backend + frontend
 └── README.md
 ```
 
@@ -110,7 +110,7 @@ A SQL choice would have been defensible too; the trade-off we accept is the lack
 
 - Node.js **20+**
 - npm **10+**
-- Docker (optional — for local MongoDB) OR a MongoDB Atlas connection string
+- Docker (optional, for the full local stack) OR a MongoDB Atlas connection string
 
 ### 1. Clone and install
 
@@ -122,19 +122,47 @@ cd backend && npm install && cd ..
 cd frontend && npm install && cd ..
 ```
 
-### 2. Start MongoDB
+### 2. Run everything with Docker
+
+The repository includes:
+
+- `backend/Dockerfile`
+- `frontend/Dockerfile`
+- `docker-compose.yml`
+
+To boot MongoDB, the backend API, and the frontend dashboard together:
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- frontend: [http://localhost:5173](http://localhost:5173)
+- backend: [http://localhost:4000](http://localhost:4000)
+- mongo: `mongodb://localhost:27017/bizscout`
+
+The compose setup mounts `backend/` and `frontend/` into their containers for local development and keeps container-only `node_modules` volumes so installs remain isolated from your host machine.
+
+Stop everything with:
+
+```bash
+docker compose down
+```
+
+### 3. Run MongoDB only
 
 **Option A — Docker (recommended for local dev):**
 
 ```bash
-docker compose up -d
+docker compose up -d mongo
 ```
 
 This boots Mongo 7 on `mongodb://localhost:27017/bizscout` with a persistent volume.
 
 **Option B — MongoDB Atlas:** Create a free M0 cluster and copy the connection string.
 
-### 3. Configure env
+### 4. Configure env for manual local runs
 
 ```bash
 cp backend/.env.example backend/.env
@@ -143,7 +171,7 @@ cp frontend/.env.example frontend/.env
 
 Edit `backend/.env` and set `MONGO_URI` if using Atlas.
 
-### 4. Run the app (two terminals)
+### 5. Run the app manually (two terminals)
 
 ```bash
 # terminal 1 — backend (http://localhost:4000)
@@ -152,6 +180,8 @@ cd backend && npm run dev
 # terminal 2 — frontend (http://localhost:5173)
 cd frontend && npm run dev
 ```
+
+Use this manual flow if you are not running the full Docker stack.
 
 The scheduler fires immediately on boot and then every 5 minutes. To trigger a ping on demand during development, hit the dev-only endpoint:
 
@@ -254,6 +284,11 @@ GitHub Actions — [.github/workflows/ci.yml](.github/workflows/ci.yml).
 ## Deployment
 
 All tiers are **free**.
+
+### Live URLs
+
+- Frontend: [https://bizscout-1.onrender.com/](https://bizscout-1.onrender.com/)
+- Backend: [https://bizscout-xh0x.onrender.com](https://bizscout-xh0x.onrender.com)
 
 ### 1. MongoDB Atlas
 
