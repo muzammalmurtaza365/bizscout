@@ -5,7 +5,7 @@
   "description": "HTTP response monitor backend — Express + Mongoose + Socket.IO",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "nodemon --watch src --ext ts --exec \"tsx src/index.ts\"",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "lint": "eslint \"src/**/*.ts\"",
@@ -43,6 +43,7 @@
     "jest": "^29.7.0",
     "mongodb-memory-server": "^9.1.8",
     "nock": "^13.5.4",
+    "nodemon": "^3.1.14",
     "socket.io-client": "^4.7.5",
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.2",

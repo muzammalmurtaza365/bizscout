@@ -1,12 +1,16 @@
 import type { ResponseListResult, ResponseRecord, StatsResult } from '../types/api';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+const API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
-    ...init,
-  });
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    ...((init?.headers as Record<string, string> | undefined) ?? {}),
+  };
+  if (API_KEY) headers['x-api-key'] = API_KEY;
+
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`API ${res.status}: ${body || res.statusText}`);
@@ -31,4 +35,4 @@ export const api = {
     request<StatsResult>(`/api/stats?window=${window}`),
 };
 
-export { API_URL };
+export { API_URL, API_KEY };

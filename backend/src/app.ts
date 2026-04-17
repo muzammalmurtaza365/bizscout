@@ -5,13 +5,19 @@ import pinoHttp from 'pino-http';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { apiKeyAuth, API_KEY_HEADER } from './middleware/auth';
 import responsesRouter from './routes/responses';
 import healthRouter from './routes/health';
 import metricsRouter from './routes/metrics';
 import { metricsMiddleware } from './middleware/metrics';
 import { runOnce } from './services/scheduler';
 
-export function createApp() {
+export interface CreateAppOptions {
+  apiKey?: string;
+}
+
+export function createApp(opts: CreateAppOptions = {}) {
+  const apiKey = opts.apiKey ?? env.API_KEY;
   const app = express();
 
   app.use(helmet());
@@ -19,6 +25,7 @@ export function createApp() {
     cors({
       origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',').map((s) => s.trim()),
       credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', API_KEY_HEADER],
     }),
   );
   app.use(express.json({ limit: '1mb' }));
@@ -34,17 +41,17 @@ export function createApp() {
   );
   app.use(metricsMiddleware);
 
-  app.use('/metrics', metricsRouter);
   app.use('/health', healthRouter);
-  // Backwards-compat alias for platforms that only support a single path.
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
   });
 
-  app.use('/api', responsesRouter);
+  const auth = apiKeyAuth(apiKey);
+  app.use('/metrics', auth, metricsRouter);
+  app.use('/api', auth, responsesRouter);
 
   if (env.NODE_ENV !== 'production') {
-    app.post('/admin/trigger', async (_req: Request, res: Response) => {
+    app.post('/admin/trigger', auth, async (_req: Request, res: Response) => {
       await runOnce();
       res.json({ ok: true });
     });

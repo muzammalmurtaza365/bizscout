@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import type { ResponseRecord } from '../types/api';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:4000';
+const API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
 type Handlers = {
   onResponse?: (r: ResponseRecord) => void;
@@ -21,6 +22,7 @@ export function useSocket(handlers: Handlers) {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
+      auth: API_KEY ? { apiKey: API_KEY } : undefined,
     });
     socketRef.current = socket;
 

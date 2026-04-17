@@ -18,6 +18,15 @@ const envSchema = z.object({
   EWMA_ALPHA: z.coerce.number().min(0).max(1).default(0.3),
   // 0 disables the TTL; anything positive drops rows after N days.
   RESPONSE_TTL_DAYS: z.coerce.number().min(0).default(30),
+  API_KEY: z.string().min(16, 'API_KEY must be at least 16 chars').optional(),
+}).superRefine((cfg, ctx) => {
+  if (cfg.NODE_ENV === 'production' && !cfg.API_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['API_KEY'],
+      message: 'API_KEY is required when NODE_ENV=production',
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

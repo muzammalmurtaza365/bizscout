@@ -180,6 +180,7 @@ curl -X POST http://localhost:4000/admin/trigger
 | `ANOMALY_MIN_SAMPLES` | `10` | Minimum samples before the detector engages |
 | `EWMA_ALPHA` | `0.3` | EWMA smoothing factor |
 | `RESPONSE_TTL_DAYS` | `30` | Auto-delete responses older than N days (Mongo TTL index). 0 disables. |
+| `API_KEY` | *(unset)* | Shared secret required on `X-API-KEY` header (REST) and Socket.IO handshake `auth.apiKey`. **Required in production**; if unset in dev/test, auth is a no-op. Must be ≥ 16 chars. |
 
 ### Frontend (`frontend/.env`)
 
@@ -187,6 +188,7 @@ curl -X POST http://localhost:4000/admin/trigger
 |---|---|---|
 | `VITE_API_URL` | `http://localhost:4000` | REST base URL |
 | `VITE_SOCKET_URL` | `http://localhost:4000` | Socket.IO URL |
+| `VITE_API_KEY` | *(empty)* | Must match backend `API_KEY`. Baked into the Vite build — treat it as a shared token for this deployment, not an end-user secret. |
 
 ---
 
@@ -352,6 +354,24 @@ Indexes:
 - **EWMA over ARIMA / Prophet.** EWMA is O(n), transparent, and has zero external deps. It won't model seasonality. For a 5-minute cadence on a public test endpoint, this is more than sufficient.
 
 ---
+
+## Authentication
+
+The REST API (`/api/*`, `/metrics`, `/admin/trigger`) and the Socket.IO endpoint are protected by a shared `X-API-KEY`.
+
+- **Header (REST):** clients send `X-API-KEY: <value>`.
+- **Handshake (Socket.IO):** clients pass `{ auth: { apiKey: <value> } }` to `io(url, …)`.
+- **Server:** [`backend/src/middleware/auth.ts`](backend/src/middleware/auth.ts) performs a `crypto.timingSafeEqual` check; missing header → `401`, wrong key → `403`. Socket handshakes without the key are rejected at `io.use()` with a `connect_error` event on the client.
+- **Public paths:** `/health`, `/health/live`, `/health/ready` stay unauthenticated so Render / Kubernetes probes keep working.
+- **Dev ergonomics:** if `API_KEY` is unset, the middleware is a no-op. Startup validation in [`config/env.ts`](backend/src/config/env.ts) forces `API_KEY` to be present (and ≥ 16 chars) when `NODE_ENV=production`, so a misconfigured deploy fails to boot instead of silently running open.
+- **CORS:** `X-API-KEY` is explicitly added to `Access-Control-Allow-Headers` so browser preflights succeed behind proxies that don't reflect request headers.
+- **Frontend note:** `VITE_API_KEY` is embedded in the built JS. Rotate it by redeploying both tiers together; don't treat it as a per-user secret.
+
+Generate a key:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 ## Production-Readiness Extras
 
